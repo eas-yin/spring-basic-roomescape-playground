@@ -427,12 +427,57 @@ public class MissionStepTest {
                         ((Number) theme.get("id")).longValue())))
                 .isTrue();
 
+        // 기존 예약이 남아 있는지 확인을 위해 삭제할 테마로 예약 생성
+        Map<String, String> reservationParams = new HashMap<>();
+        reservationParams.put("date", "2026-11-10");
+        reservationParams.put("time", "1");
+        reservationParams.put("theme", themeId.toString());
+
+        ExtractableResponse<Response> reservationResponse = RestAssured.given()
+                .body(reservationParams)
+                .cookie("token", brownToken)
+                .contentType(ContentType.JSON)
+                .post("/reservations")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        Long reservationId = reservationResponse.jsonPath().getLong("id");
+
         // 7. 관리자 삭제 성공
         RestAssured.given()
                 .cookie("token", adminToken)
                 .delete("/themes/" + themeId)
                 .then()
                 .statusCode(204);
+
+        // 8. 삭제된 테마가 목록에서 제외되는지 확인
+        List<Map<String, Object>> afterDelete = RestAssured.given()
+                .get("/themes")
+                .then()
+                .statusCode(200)
+                .extract()
+                .jsonPath()
+                .getList(".");
+
+        // 조건에 맞는 데이터가 하나도 없는지 확인
+        assertThat(afterDelete.stream()
+                .noneMatch(theme -> themeId.equals(
+                        ((Number) theme.get("id")).longValue())))
+                .isTrue();
+
+        // 9. 삭제된 테마를 사용하는 기존 예약은 유지되는지 확인
+        List<ReservationResponse> reservations = RestAssured.given()
+                .get("/reservations")
+                .then()
+                .statusCode(200)
+                .extract()
+                .jsonPath()
+                .getList(".", ReservationResponse.class);
+
+        assertThat(reservations.stream()
+                .anyMatch(reservation -> reservation.getId().equals(reservationId)))
+                .isTrue();
     }
 
     @Test
