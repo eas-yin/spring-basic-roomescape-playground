@@ -651,4 +651,56 @@ public class MissionStepTest {
         assertThat(memberRepository.existsByEmail("empty@email.com"))
                 .isFalse();
     }
+
+    @Test
+    @DisplayName("관리자 대리 예약은 관리자만 삭제 가능하다.")
+    void adminReservationAuthorization() {
+        String brownToken = createToken("brown@email.com", "password");
+        String adminToken = createToken("admin@email.com", "password");
+
+        Map<String, String> params = new HashMap<>();
+        params.put("name", "대리예약자");
+        params.put("date", "2026-10-11");
+        params.put("time", "1");
+        params.put("theme", "1");
+
+        // 관리자가 대리 예약 생성
+        ExtractableResponse<Response> response = RestAssured.given()
+                .body(params)
+                .cookie("token", adminToken)
+                .contentType(ContentType.JSON)
+                .post("/reservations")
+                .then()
+                .statusCode(201)
+                .extract();
+
+        Long reservationId = response.jsonPath().getLong("id");
+
+        // 일반 회원이 삭제하면 403
+        RestAssured.given()
+                .cookie("token", brownToken)
+                .delete("/reservations/" + reservationId)
+                .then()
+                .statusCode(403);
+
+        // 삭제가 거절되고 예약이 남아 있는지 확인
+        List<ReservationResponse> reservations = RestAssured.given()
+                .get("/reservations")
+                .then()
+                .statusCode(200)
+                .extract()
+                .jsonPath()
+                .getList(".", ReservationResponse.class);
+
+        assertThat(reservations.stream()
+                .anyMatch(reservation -> reservation.getId().equals(reservationId)))
+                .isTrue();
+
+        // 관리자가 삭제하면 204
+        RestAssured.given()
+                .cookie("token", adminToken)
+                .delete("/reservations/" + reservationId)
+                .then()
+                .statusCode(204);
+    }
 }

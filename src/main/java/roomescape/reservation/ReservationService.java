@@ -65,10 +65,17 @@ public class ReservationService {
         return new ReservationResponse(saveReservation.getId(), name, reservation.getTheme().getName(), reservation.getDate(), reservation.getTime().getValue());
     }
 
-    public void deleteById(Long id, Long memberId) {
+    public void deleteById(Long id, Long memberId, String role) {
         Reservation reservation = reservationRepository.findById(id).orElseThrow();
 
-        if (!reservation.getMember().getId().equals(memberId)) {
+        // 관리자 대리 예약일 때, 관리자면 삭제 가능, 일반 회원이면 403
+        if (reservation.getMember() == null) {
+            if (!role.equals("ADMIN")) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            }
+        }
+        // 일반 회원일 때, 본인은 삭제 가능, 다른 회원이면 403, 관리자지만 다른 회원이면 403
+        else if (!reservation.getMember().getId().equals(memberId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
 
