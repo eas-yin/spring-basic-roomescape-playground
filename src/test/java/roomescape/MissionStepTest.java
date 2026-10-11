@@ -8,8 +8,10 @@ import io.restassured.response.ExtractableResponse;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
+import roomescape.member.MemberRepository;
 import roomescape.reservation.MyReservationResponse;
 import roomescape.reservation.ReservationResponse;
 import roomescape.waiting.WaitingResponse;
@@ -611,5 +613,42 @@ public class MissionStepTest {
 
         assertThat(response.jsonPath().getString("name"))
                 .isEqualTo("다른사람");
+    }
+
+    @Test
+    @DisplayName("비밀번호가 누락될 경우 회원가입에 실패한다.")
+    void signupWithoutPassword() {
+        Map<String, String> params = new HashMap<>();
+        params.put("name", "테스트");
+        params.put("email", "missing@email.com");
+
+        RestAssured.given()
+                .body(params)
+                .contentType(ContentType.JSON)
+                .post("/members")
+                .then()
+                .statusCode(400);
+    }
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Test
+    @DisplayName("비밀번호가 빈 문자열일 경우 회원가입에 실패한다.")
+    void signupWithEmptyPassword() {
+        Map<String, String> params = new HashMap<>();
+        params.put("name", "테스트");
+        params.put("email", "empty@email.com");
+        params.put("password", "");
+
+        RestAssured.given()
+                .body(params)
+                .contentType(ContentType.JSON)
+                .post("/members")
+                .then()
+                .statusCode(400);
+
+        assertThat(memberRepository.existsByEmail("empty@email.com"))
+                .isFalse();
     }
 }
